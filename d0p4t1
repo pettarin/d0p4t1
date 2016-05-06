@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Date: 2016-05-05
+# Version: 1.0.0
+# License: MIT
+
+usage() {
+    echo ""
+    echo "NAME"
+    echo "  $0 - scrape the DOP online"
+    echo ""
+    echo "SYNOPSIS"
+    echo "  $0 from to [sleep]"
+    echo ""
+    echo "DESCRIPTION"
+    echo "  Download GIF and MP3 files from the DOP online"
+    echo ""
+    echo "  from:  start scraping from this lemma (e.g., 1)"
+    echo "  to:    stop scraping at this lemma (e.g., 89865)"
+    echo "  sleep: sleep for this many seconds after each wget (default: 1)"
+    echo ""
+    echo "EXAMPLES"
+    echo "  $ $0 64778 64780"
+    echo "  $ $0 64778 64780 5"
+    echo ""
+    exit 2
+}
+
+lemma() {
+    URL="http://www.dizionario.rai.it"
+    TMP="m"
+    OUT=`printf "l%06d" $1`
+    rm -f $TMP
+    wget "$URL/poplemma.aspx?lid=$1" -O "$OUT" 2> /dev/null
+
+    grep 'Cache[^"]*gif' $OUT -o > "$TMP"
+    LINES=`cat $TMP | wc -l`
+    if [ "$LINES" -eq 0 ]
+    then
+        echo "  No GIF"
+    else
+        echo "  Has GIF"
+        MOUT="$OUT.gif"
+        IMG=`cat $TMP`
+        wget "$URL/$IMG" -O "$MOUT" 2> /dev/null
+        echo "    Downloaded $MOUT"
+    fi
+
+    grep -e "Cache[^']*mp3" $OUT -o > "$TMP"
+    LINES=`cat $TMP | wc -l`
+    if [ "$LINES" -eq 0 ]
+    then
+        echo "  No MP3"
+    else
+        echo "  Has $LINES MP3"
+        I=1
+        while read line
+        do
+            MOUT="$OUT.$I.mp3"
+            wget "$URL/$line" -O "$MOUT" 2> /dev/null
+            echo "    Downloaded $MOUT"
+            I=$((I+1))
+        done < "$TMP"
+    fi
+    rm -f $TMP
+}
+
+
+if [ "$#" -lt 2 ]
+then
+    usage
+fi
+FROM="$1"
+TO="$2"
+SLEEP=1
+if [ "$#" -ge 3 ]
+then
+    SLEEP="$3"
+fi
+
+for ((i=FROM; i<=TO; i++))
+do
+    echo "Downloading lemma $i ..."
+    lemma $i
+    sleep $SLEEP
+done
+exit 0
+
+
+
